@@ -14,22 +14,59 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QLabel, QPushButton, QWidget
 from cryptography.fernet import Fernet
 from customtkinter import *
-import installation
+import os
+
+appdata = os.getenv("APPDATA").replace('\'', '/')
+launcher_directory = appdata + "/.lescoupainslauncher"
+
+
+def createFolder():
+    if not os.path.exists(launcher_directory):
+        os.makedirs(launcher_directory)
+        print(f"Le dossier '{launcher_directory}' a été crée avec succès.")
+    else:
+        print(f"Le dossier '{launcher_directory}' existe déjà.")
+
+    return launcher_directory
+
+
+current_max = 0
+
+
+def set_status(status: str):
+    print(status)
+
+
+def set_progress(progress: int):
+    if current_max != 0:
+        print(f"{progress}/{current_max}")
+
+
+def set_max(new_max: int):
+    global current_max
+    current_max = new_max
+
+
+callback = {
+    "setStatus": set_status,
+    "setProgress": set_progress,
+    "setMax": set_max
+}
 
 
 # bug impossible d'ouvrir deux fois de suite une QApplication
 
 def main():
     def widget_connect():
-        launch_button.place(x=310, y=315)
-        logout_button.place(x=328, y=400)
+        launch_button.place(x=310, y=330)
+        logout_button.place(x=305, y=400)
         login_button.place_forget()
         bouton.place_forget()
 
     def widget_disconnect():
         launch_button.place_forget()
         logout_button.place_forget()
-        login_button.place(x=310, y=330)
+        login_button.place(x=270, y=330)
         bouton.place(x=305, y=400)
         bouton.deselect()
 
@@ -104,7 +141,7 @@ def main():
     def update_forge():
         download_forge = True
 
-        for x in minecraft_launcher_lib.utils.get_installed_versions(installation.launcher_directory):
+        for x in minecraft_launcher_lib.utils.get_installed_versions(launcher_directory):
             if x["id"] == full_name_forge_version:
                 download_forge = False
                 break
@@ -134,19 +171,19 @@ def main():
                 "setMax": set_max
             }
 
-            text_update = cancan.create_text(400, 500, text="Mise à jour de forge...\nCeci peut prendre quelques minutes", font=('Impact', 20), fill='#BF2727')
+            text_update = canvas.create_text(400, 500, text="Mise à jour de forge...\nCeci peut prendre quelques minutes", font=('Impact', 20), fill='#BF2727')
             window.update()
 
             print("La version de Forge n'est pas installée. Téléchargement en cours.")
             minecraft_launcher_lib.forge.install_forge_version(name_forge_version, minecraft_directory, callback=progression)
-            cancan.delete(text_update)
+            canvas.delete(text_update)
             progressbar.destroy()
             print("Installation terminée.")
         else:
             print("La version de Forge est déjà installée.")
 
     def update_mods():
-        mods_folder = installation.launcher_directory + "/mods"
+        mods_folder = launcher_directory + "/mods"
 
         # créé le répertoire mods s'il n'existe pas
         if not os.path.exists(mods_folder):
@@ -154,20 +191,20 @@ def main():
             print("Le dossier des mods a été crée !")
 
         # check si la version des mods est la même
-        versionCheck_path = installation.launcher_directory + "/versionCheck.json"
+        file_path = launcher_directory + "/modsUrl.json"
 
-        with open(versionCheck_path, "w") as f:
-            f.write(requests.get("https://raw.githubusercontent.com/DCelcraft/lescoupains-launcher/main/versionLauncher.json").text)
+        with open(file_path, "w") as f:
+            f.write(requests.get("https://raw.githubusercontent.com/DCelcraft/lescoupains-launcher/main/modsUrl.json").text)
 
-        with open(versionCheck_path, "r") as f:
+        with open(file_path, "r") as f:
             data = json.load(f)
 
-        with open("versionLauncher.json", "r") as f:
+        with open("modsUrl.json", "r") as f:
             data2 = json.load(f)
 
         def downloadMods():
             print("Téléchargement des mods.")
-            text_update = cancan.create_text(400, 350, text="Téléchargement des mods...\nCeci peut prendre une minute", font=('Impact', 20), fill='#BF2727')
+            text_update = canvas.create_text(400, 350, text="Téléchargement des mods...\nCeci peut prendre une minute", font=('Impact', 20), fill='#BF2727')
             window.update()
             progressbar = CTkProgressBar(window)
             progressbar.set(0)
@@ -179,7 +216,7 @@ def main():
                 progressbar.set(status / 100)
                 window.update_idletasks()
 
-            urllib.request.urlretrieve("https://www.dropbox.com/scl/fi/9msrgnnxxvw6vhn0ul9ye/mods.zip?rlkey=risipdqsd911h90d2plwsxpmw&dl=1", mods_folder + "/mods.zip", reporthook=reporthook)
+            urllib.request.urlretrieve(data2["url"], mods_folder + "/mods.zip", reporthook=reporthook)
             print("Le fichier zip des mods a été téléchargé.")
 
             with ZipFile(mods_folder + "/mods.zip", "r") as archive:
@@ -191,7 +228,7 @@ def main():
             except OSError as e:
                 print(f"Une erreur s'est produite en essayant de supprimer le fichier mods.zip : {e}")
 
-            cancan.delete(text_update)
+            canvas.delete(text_update)
             progressbar.destroy()
 
         if len(os.listdir(mods_folder)) == 0:
@@ -199,12 +236,12 @@ def main():
             downloadMods()
 
         # check si la version des mods est bien la bonne avec GitHub et le launcher
-        elif data["mods"] == data2["mods"]:
-            print("La version des mods est la bonne. Pas besoin de retélécharger les mods !")
+        elif data["modsUrl"] == data2["modsUrl"]:
+            print("Le lien pour télécharger les mods est la bonne. Aucune mise à jour nécessaire !")
 
         # sinon on télécharge les mods
         else:
-            print("La version des mods n'est pas pas la bonne. Mise à jour des mods !")
+            print("Le lien pour télécharger les mods n'est pas pas la même. Mise à jour des mods !")
             for file in os.listdir(mods_folder):
                 os.remove(mods_folder + "/" + file)
                 print(f"Suppression du mod {file}")
@@ -220,15 +257,13 @@ def main():
                    "resolutionWidth": launcher_ini.get('SETTING_MINECRAFT', 'width'),
                    "resolutionHeight": launcher_ini.get('SETTING_MINECRAFT', 'height'),
                    "jvmArguments": ["-Xmx2G", "-Xms2G"]
-                   }  # "server": None -> don't work
+                   }
 
         if launcher_ini.getboolean('SETTING_MINECRAFT', 'show_console'):
             options['executablePath'] = 'java'
         else:
             options['executablePath'] = 'javaw'
 
-        if launcher_ini.getboolean('SETTING_MINECRAFT', 'auto_connect'):
-            options['server'] = launcher_ini.get('SETTING_MINECRAFT', 'server')
         xmx = launcher_ini.get('SETTING_MINECRAFT', 'xmx')
         xms = launcher_ini.get('SETTING_MINECRAFT', 'xms')
         options["jvmArguments"] = [f"-Xmx{xmx}M", f"-Xms{xms}M"]
@@ -267,12 +302,11 @@ def main():
             height = height_entry.get()
             print(f'Xmx : {xmx} ; Xms : {xms} ; Width : {width} ; Height : {height}')
             if radio_var.get() == 0 and (str(width) == '' or str(height) == '') or str(xmx) == '' or str(xms) == '':
-                print('You can\'t save')
-                messagebox.showerror(title='Error',
-                                     message='You can\'t save with an empty value')
+                print('Vous ne pouvez pas sauvegarder.')
+                messagebox.showerror(title='Error', message='Vous ne pouvez pas sauvegarder avec une valeur vide.')
             else:
                 with open("launcher.ini", "w") as file:
-                    print('saving...')
+                    print('Sauvegarde en cours...')
 
                     if console_variable.get() == 1:
                         launcher_ini['SETTING_MINECRAFT']['show_console'] = 'True'
@@ -290,10 +324,11 @@ def main():
                     launcher_ini['SETTING_MINECRAFT']['xms'] = str(xms)
 
                     launcher_ini.write(file)
+                    print("Sauvegarde terminée !")
 
         def change_state_radiobutton(state):
             if state == 'disable':
-                print('custom resolution disable')
+                print('Résolution custom désactivée')
                 height_entry.delete(0, END)
                 width_entry.delete(0, END)
                 height_entry.configure(state="disabled")
@@ -305,7 +340,7 @@ def main():
                 height_entry.configure(textvariable=height_var)
                 width_entry.configure(textvariable=width_var)
             elif state == 'enable':
-                print('custom resolution enable')
+                print('Résolution custom activée')
                 height_entry.configure(state="normal")
                 height_entry.delete(0, END)
                 height_entry.insert(END, config_dict.get('height'))
@@ -314,36 +349,29 @@ def main():
                 width_entry.insert(END, config_dict.get('width'))
 
         def reset():
-            if messagebox.askokcancel(title="Reset config",
-                                      message='Are you sure you want to reset the launcher settings ?'):
+            if messagebox.askokcancel(title="Réinitialisation de la configuration", message='Êtes-vous sûr de vouloir réinitialiser les paramètres du launcher ?'):
                 create_config_file()
                 os.remove('launcher.ini')
                 with open('launcher.ini', 'w') as file:
                     reset_launcher = ConfigParser()
                     reset_launcher.read('launcher.ini')
-                    reset_launcher.add_section('SETTING_FRAME')
                     reset_launcher.add_section('SETTING_MINECRAFT')
-                    reset_launcher['SETTING_FRAME']['setting_title'] = "Settings"
-                    reset_launcher['SETTING_FRAME']['setting_geometry'] = "600x350"
-                    reset_launcher['SETTING_MINECRAFT']['server'] = "kipikcube.tk"
                     reset_launcher['SETTING_MINECRAFT']['show_console'] = "False"
                     reset_launcher['SETTING_MINECRAFT']['custom_resolution'] = "False"
                     reset_launcher['SETTING_MINECRAFT']['width'] = "854"
                     reset_launcher['SETTING_MINECRAFT']['height'] = "480"
-                    reset_launcher['SETTING_MINECRAFT']['xmx'] = "2000"
+                    reset_launcher['SETTING_MINECRAFT']['xmx'] = "4000"
                     reset_launcher['SETTING_MINECRAFT']['xms'] = "500"
 
                     reset_launcher.write(file)
-                messagebox.showwarning(title='Restart Launcher', message='The launcher will close, please relaunch it')
+                messagebox.showwarning(title='Redémarrer le Launcher', message='Le Launcher va se fermer, merci de le relancer.')
                 sys.exit(0)
 
-        setting_title = launcher_ini.get('SETTING_FRAME', 'setting_title')
-        setting_geometry = launcher_ini.get('SETTING_FRAME', 'setting_geometry')
         setting_window = CTkToplevel()
-        setting_window.geometry(setting_geometry)
-        setting_window.title(setting_title)
+        setting_window.geometry("600x350")
+        setting_window.title("Paramètres")
         setting_window.resizable(width=False, height=False)
-        # setting_window.iconbitmap('assets/kipikcube.ico')
+        setting_window.iconbitmap('assets/logo.ico')
         setting_window.grab_set()
 
         config_dict = launcher_ini['SETTING_MINECRAFT']
@@ -369,7 +397,7 @@ def main():
             height_entry.configure(state="disabled")
             width_entry.configure(state="disabled")
 
-        save_button = CTkButton(setting_window, text='SAVE', font=('Impact', 20), command=save, fg_color='green')
+        save_button = CTkButton(setting_window, text='SAUVEGARDER', font=('Impact', 20), command=save, fg_color='green')
         label_jvm = CTkLabel(setting_window, text='Argument JVM', font=('Impact', 15))
         mo_label = CTkLabel(setting_window, text='Mo')
         mo_label1 = CTkLabel(setting_window, text='Mo')
@@ -379,18 +407,16 @@ def main():
         xmx_entry.insert(END, config_dict.get('xmx'))
         xms_entry = CTkEntry(setting_window, width=65, placeholder_text=config_dict.getint('xms'))
         xms_entry.insert(END, config_dict.get('xms'))
-        cancel_button = CTkButton(setting_window, command=setting_window.destroy, text='CANCEL/EXIT',
-                                  font=('Impact', 20), fg_color='grey')
+        cancel_button = CTkButton(setting_window, command=setting_window.destroy, text='ANNULER/QUITTER', font=('Impact', 20), fg_color='grey')
         console_variable = IntVar()
-        console = CTkCheckBox(setting_window, text='Show console', variable=console_variable)
+        console = CTkCheckBox(setting_window, text='Montrer la console', variable=console_variable)
         console_value = config_dict.getboolean('show_console')
         if console_value:
             console.select()
         elif not console_value:
             console.deselect()
 
-        reset_button = CTkButton(setting_window, text='Reset', width=20, fg_color='grey',
-                                 command=reset)
+        reset_button = CTkButton(setting_window, text='Réinitialiser', width=20, fg_color='grey', command=reset)
 
         default_resolution.place(x=50, y=100)
         custom_resolution.place(x=50, y=150)
@@ -418,7 +444,7 @@ def main():
         with open('config.ini', 'w') as config_file:
             config_file.write('[LOGIN]\nremember = 0')
 
-    key = "secret key"
+    key = b'gN12nuGGNSHu0pMFna0kG1jDqYNx1hyFwmW1jDUs494='
     id_ini = ConfigParser()
     launcher_ini = ConfigParser()
     config_ini = ConfigParser()
@@ -439,7 +465,7 @@ def main():
         config_ini.read('config.ini')
         remember = int(config_ini.get('LOGIN', 'remember'))
     except (NoSectionError, NoOptionError, ValueError, ParsingError) as error:
-        print(f'Error, corrupted file \'config.ini\': {error}')
+        print(f'Erreur, le fichier \"config.ini\" est corrompu : {error}')
         print('Repairing file...')
         create_config_file()
         remember = 0
@@ -449,40 +475,40 @@ def main():
 
     window = CTk()
     window.title("Les Coupains Launcher")
-    # window.iconbitmap('assets/kipikcube.ico')
+    window.iconbitmap('assets/logo.ico')
     window.geometry("720x480")
     window.resizable(width=False, height=False)
     fond = PhotoImage(file="assets/fond.png")
-    cancan = CTkCanvas(master=window, width=720, height=480, highlightthickness=0)
-    cancan.create_image(0, 0, anchor=NW, image=fond)
-    cancan.place(x=-1, y=-1)
+    canvas = CTkCanvas(master=window, width=720, height=480, highlightthickness=0)
+    canvas.create_image(0, 0, anchor=NW, image=fond)
+    canvas.place(x=-1, y=-1)
 
-    text_starting = cancan.create_text(380, 100, text="Démarrage du Launcher", font=('Impact', 30))
+    text_starting = canvas.create_text(380, 100, text="Démarrage du Launcher", font=('Impact', 30))
     window.update()
 
     v = IntVar()
-    bouton = CTkCheckBox(window, variable=v, text="Remember me")
+    bouton = CTkCheckBox(window, variable=v, text="Se souvenir")
 
-    launch_button = CTkButton(window, text="PLAY", width=100, height=50, font=('Impact', 30), command=launch)
-    login_button = CTkButton(window, text="LOGIN", width=100, height=50, font=('Impact', 30), command=login)
+    launch_button = CTkButton(window, text="JOUER", width=100, height=50, font=('Impact', 30), command=launch)
+    login_button = CTkButton(window, text="SE CONNECTER", width=100, height=50, font=('Impact', 30), command=login)
 
-    logout_button = CTkButton(window, text="LOGOUT", width=55, height=10, command=logout, fg_color='red',
+    logout_button = CTkButton(window, text="SE DÉCONNECTER", width=55, height=10, command=logout, fg_color='red',
                               font=('Impact', 15))
 
-    setting_button = CTkButton(window, text='Settings', width=0, height=0, border_spacing=0, fg_color='grey',
+    setting_button = CTkButton(window, text='Paramètres', width=10, height=10, border_spacing=0, fg_color='grey',
                                command=setting)
 
     # Répertoire de Minecraft
-    minecraft_directory = installation.launcher_directory
+    minecraft_directory = launcher_directory
     # Get Minecraft directory
-    print(f"Minecraft directory : {minecraft_directory}")
+    print(f"Dossier de Minecraft : {minecraft_directory}")
     name_forge_version = "1.20.1-47.2.1"
     full_name_forge_version = "1.20.1-forge-47.2.1"
 
     update_forge()
     update_mods()
 
-    setting_button.place(x=650, y=20)
+    setting_button.place(x=630, y=20)
 
     # applique les bons widgets en fonction de si l'utilisateur est logger sur le launcher ou non
     if remember == 1:
@@ -490,7 +516,7 @@ def main():
     else:
         widget_disconnect()
 
-    cancan.delete(text_starting)
+    canvas.delete(text_starting)
 
     window.mainloop()
 

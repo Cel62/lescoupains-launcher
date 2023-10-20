@@ -163,3 +163,4 @@ test.py
 .idea/
 logs/
 identifians launcher.txt
+others/cryptage.py
